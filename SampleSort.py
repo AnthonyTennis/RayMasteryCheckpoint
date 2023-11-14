@@ -20,8 +20,11 @@ def sampleSort(arr, total_buckets):
     if len(arr)/total_buckets < 2000:
         print("Just doing quicksort, bucket size is too small")
         return qs.quickSort(arr, 0, len(arr)-1)
-    unsorted_splitters = np.random.choice(arr, total_buckets - 1, replace=False)
-    splitters = qs.quickSort(unsorted_splitters,0,len(unsorted_splitters) -1)
+    # unsorted_splitters = np.random.choice(arr, total_buckets - 1, replace=False)
+    # randomly selecting was far too inefficient, have to make this more efficient
+    percentiles = [(i/ total_buckets) * 100 for i in range (1, total_buckets)]
+    splitters = np.sort(np.percentile(arr, percentiles))
+    # splitters = np.sort(unsorted_splitters,0,len(unsorted_splitters) -1)
     print(splitters)
 
     # Step 2: Distribute data into buckets
@@ -44,6 +47,8 @@ def sampleSort(arr, total_buckets):
 
     # Step 4: Concatenate the results
     return [element for bucket in sorted_buckets for element in bucket]
+
+
 
 @ray.remote
 def call_qs(bucket):
