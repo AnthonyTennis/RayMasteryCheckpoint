@@ -21,37 +21,46 @@ def sampleSort(arr, total_buckets):
         print("Just doing quicksort, bucket size is too small")
         return qs.quickSort(arr, 0, len(arr)-1)
     # unsorted_splitters = np.random.choice(arr, total_buckets - 1, replace=False)
+    # splitters = np.sort(unsorted_splitters)
     # randomly selecting was far too inefficient, have to make this more efficient
     percentiles = [(i/ total_buckets) * 100 for i in range (1, total_buckets)]
     splitters = np.sort(np.percentile(arr, percentiles))
-    # splitters = np.sort(unsorted_splitters,0,len(unsorted_splitters) -1)
-    print(splitters)
+    # print(splitters)
 
     # Step 2: Distribute data into buckets
-    buckets = [[] for _ in range(total_buckets)]
-    for element in arr:
-        in_a_bucket = False
-        for i, splitter in enumerate(splitters):
-            if element < splitter:
-                buckets[i].append(element)
-                in_a_bucket=True
-                break
-        if in_a_bucket == False:
-            buckets[-1].append(element)
-
-    for bucket in buckets:
-        print(len(bucket))
+    chunk_size = len(arr) // total_buckets
+    chunks = [arr[i:i+chunk_size] for i in range(0, len(arr), chunk_size)]
+    buckets_unprocessed =  [process_chunk.remote(chunk, splitters, total_buckets) for chunk in chunks]
+    # Combine buckets from all chunks
+    combined_buckets = [[] for _ in range(total_buckets)]
+    for chunk_buckets in ray.get(buckets_unprocessed):
+        for i, bucket in enumerate(chunk_buckets):
+            combined_buckets[i].extend(bucket)
 
     # Step 3: Sort each bucket in parallel
-    sorted_buckets = ray.get([call_qs.remote(bucket) for bucket in buckets])
+    sorted_buckets = ray.get([call_qs.remote(bucket) for bucket in combined_buckets])
 
     # Step 4: Concatenate the results
     return [element for bucket in sorted_buckets for element in bucket]
 
+@ray.remote
+def process_chunk(chunk, splitters, total_buckets):
+    buckets = [[] for _ in range(total_buckets)]
+    for element in chunk:
+        placed = False
+        for i, splitter in enumerate(splitters):
+            if element < splitter:
+                buckets[i].append(element)
+                placed = True
+                break
+        if not placed:
+            buckets[-1].append(element)
+    return buckets
 
 
 @ray.remote
 def call_qs(bucket):
     return qs.quickSort(bucket, 0, len(bucket)-1)
+    # return np.sort(bucket)
 
     
